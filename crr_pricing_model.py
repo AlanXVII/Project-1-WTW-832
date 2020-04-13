@@ -8,7 +8,7 @@ import math as mat
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+from mpl_toolkits.mplot3d import Axes3D
 
 
 def CRR(call_put, n, S, K, r, vol,  t):
@@ -51,32 +51,38 @@ def BSM(call_put, S, K, rfr, vol, t):
 
 def Price_Error(call_put, S, K, rfr, vol, t, n):
     
-    error = abs(BSM(call_put, S, K, rfr, vol, t)-CRR(call_put, int(n), S, K, rfr, vol,  t))
+    error = BSM(call_put, S, K, rfr, vol, t)-CRR(call_put, int(n), S, K, rfr, vol,  t)
     
     return error
 
 #Plotting BSM v CRR v Strike Prices
-strikes = np.linspace(1,200,200)
-bsm_prices = [BSM("call",100,x,0.1,0.2,10) for x in strikes]
-crr_prices = [CRR("call",10,100,x,0.1,0.2,10) for x in strikes]
+N = np.linspace(1,100,100)
+error_otm = [Price_Error("call",100, 150, 0.1, 0.2, 10, n) for n in N]
+error_itm = [Price_Error("call",100, 50, 0.1, 0.2, 10, n) for n in N]
+error_atm = [Price_Error("call",100, 100, 0.1, 0.2, 10, n) for n in N]
 
-plt.title("Option Prices: CRR vs BSM", fontsize=24) 
-plt.xlabel("Strike Prices", fontsize=18) 
-plt.ylabel("Option Value", fontsize=18)
-
-plt.plot(strikes, bsm_prices, 'k-') 
-plt.plot(strikes, crr_prices, 'r-')
-plt.plot()
-plt.legend(["BSM", "CRR"])
-plt.show() 
-
-#Plotting Pricing Error
-steps = np.linspace(1,100,100)
-error = [Price_Error("call",100, 115, 0.1, 0.2, 10, n) for n in steps]
-
-plt.title("Pricing Error vs Binomial Steps", fontsize=24) 
+plt.title("Pricing Error", fontsize=24) 
 plt.xlabel("Number of Steps", fontsize=18) 
-plt.ylabel("Pricing Error", fontsize=18)
+plt.ylabel("Error", fontsize=18)
 
-plt.plot(steps, error, 'k-')
-plt.show() 
+plt.plot(N, error_atm, 'k-', error_itm, 'r-', error_itm, 'b-')
+
+plt.show()
+
+# plt.legend(["BSM", "CRR"])
+# plt.show() 
+# plt.savefig('bsm_vs_crr.png')
+
+
+
+# plt.plot(strikes, bsm_prices, 'k-') 
+
+# plt.title("Pricing Error vs Binomial Steps", fontsize=24) 
+# plt.xlabel("Number of Steps", fontsize=18) 
+# plt.ylabel("Pricing Error", fontsize=18)
+
+# bsm_prices = [BSM("call",100,x,0.1,0.2,10) for x in strikes]
+# crr_prices = [CRR("call",10,100,x,0.1,0.2,10) for x in strikes]
+
+
+# plt.show() 
