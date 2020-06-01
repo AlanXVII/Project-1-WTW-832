@@ -1,88 +1,91 @@
 # -*- coding: utf-8 -*-
 """
-Spyder Editor
+Created on Mon Apr 27 10:35:35 2020
 
-This is a temporary script file.
+@author: alanw
 """
-import math as mat
+
 import numpy as np
 from scipy.stats import norm
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+############
+# CRR Model
+############
 
-
-def CRR(call_put, n, S, K, r, vol,  t):
-    delT = t / n
-    R = mat.exp(r*delT)
-    u = mat.exp(vol*delT)
-    d = 1/u
-    p = (R-d)/(u-d) 
-    q = 1-p  
-        
-    if R > u or R < d:
-        print("Error: Risk-free-rate and associated u&d values do not satisfy the following: d<r<u")
-        return  
+def CRR(Put_Call, n, S_0, X, rfr, vol, t, AMN_EUR):  
+    deltaT = t/n 
+    u = np.exp(vol*np.sqrt(deltaT))
+    d = 1./u
+    R = np.exp(rfr*deltaT)
+    p = (R-d)/(u-d)
+    q = 1-p     
     
-    C = 0      
-        
-    for j in range(0, n):
-        i = n-j
-        fact_term = mat.factorial(n)/(mat.factorial(j)*mat.factorial(i))
-        x = fact_term*(p**j)*(q**i)*max(0,(u**j)*(d**i)*S-K)
-        C += x
-        
-    if call_put == "call":
-        opt_price = C/R**n
-    elif call_put == "put":
-        opt_price = C/R**n - S - K/R
+    # simulating the underlying price paths
+    S = np.zeros((n+1,n+1))
+    S[0,0] = S_0
+    for i in range(1,n+1):
+        S[i,0] = S[i-1,0]*u
+        for j in range(1,i+1):
+            S[i,j] = S[i-1,j-1]*d
+    
+    # option value at final node   
+    V = np.zeros((n+1,n+1)) # V[i,j] is the option value at node (i,j)
+    for j in range(n+1):
+        if Put_Call=="C":
+            V[n,j] = max(0, S[n,j]-X)
+        elif Put_Call=="P":
+            V[n,j] = max(0, X-S[n,j])
+            
+    # European Otpion: backward induction to the option price V[0,0]        
+    if AMN_EUR == "E":            
+    
+        for i in range(n-1,-1,-1):
+            for j in range(i+1):
+                    V[i,j] = max(0, 1/R*(p*V[i+1,j]+q*V[i+1,j+1]))
+        opt_price = V[0,0]
+    # American Otpion: backward induction to the option price V[0,0] 
+    elif AMN_EUR == "A":
+        for i in range(n-1,-1,-1):
+            for j in range(i+1):
+                    if Put_Call=="P":
+                        V[i,j] = max(0, X-S[i,j], 
+                                     1/R*(p*V[i+1,j]+q*V[i+1,j+1]))
+                    elif Put_Call=="C":
+                        V[i,j] = max(0, S[i,j]-X,
+                                     1/R*(p*V[i+1,j]+q*V[i+1,j+1]))
+        opt_price = V[0,0]
         
     return opt_price
 
-def BSM(call_put, S, K, rfr, vol, t):
-    d_one = (mat.log(S/K)+(rfr+vol**2/2)*t)/(vol*mat.sqrt(t))
-    d_two = d_one - vol*mat.sqrt(t)
+#############
+# BSM Model
+#############
+def BSM(Put_Call, S_0, X, rfr, vol, t):
+    d_one = (np.log(S_0/X)+(rfr+vol**2/2)*t)/(vol*np.sqrt(t))
+    d_two = d_one - vol*np.sqrt(t)
     
-    if call_put == "call":
-        opt_price = S*norm.cdf(d_one) - K*mat.exp(-rfr*t)*norm.cdf(d_two)
-    elif call_put == "put":
-        opt_price = K*mat.exp(-rfr*t)*norm.cdf(-d_two) - S*norm.cdf(-d_one)
+    if Put_Call == "C":
+        opt_price = S_0*norm.cdf(d_one) - X*np.exp(-rfr*t)*norm.cdf(d_two)
+    elif Put_Call == "P":
+        opt_price = X*np.exp(-rfr*t)*norm.cdf(-d_two) - S_0*norm.cdf(-d_one)
     
     return opt_price
-
-def Price_Error(call_put, S, K, rfr, vol, t, n):
-    
-    error = BSM(call_put, S, K, rfr, vol, t)-CRR(call_put, int(n), S, K, rfr, vol,  t)
+################
+# Pricing Error
+################
+def Price_Error(Put_Call, n, S_0, X, rfr, vol, t):
+    AMN_EUR = "E"    
+    error = BSM(Put_Call, S_0, X, rfr, vol, t)-CRR(Put_Call, n, S_0, X, rfr,
+                                                   vol, t, AMN_EUR)
     
     return error
 
-#Plotting BSM v CRR v Strike Prices
-N = np.linspace(1,100,100)
-error_otm = [Price_Error("call",100, 150, 0.1, 0.2, 10, n) for n in N]
-error_itm = [Price_Error("call",100, 50, 0.1, 0.2, 10, n) for n in N]
-error_atm = [Price_Error("call",100, 100, 0.1, 0.2, 10, n) for n in N]
-
-plt.title("Pricing Error", fontsize=24) 
-plt.xlabel("Number of Steps", fontsize=18) 
-plt.ylabel("Error", fontsize=18)
-
-plt.plot(N, error_atm, 'k-', error_itm, 'r-', error_itm, 'b-')
-
-plt.show()
-
-# plt.legend(["BSM", "CRR"])
-# plt.show() 
-# plt.savefig('bsm_vs_crr.png')
-
-
-
-# plt.plot(strikes, bsm_prices, 'k-') 
-
-# plt.title("Pricing Error vs Binomial Steps", fontsize=24) 
-# plt.xlabel("Number of Steps", fontsize=18) 
-# plt.ylabel("Pricing Error", fontsize=18)
-
-# bsm_prices = [BSM("call",100,x,0.1,0.2,10) for x in strikes]
-# crr_prices = [CRR("call",10,100,x,0.1,0.2,10) for x in strikes]
-
-
-# plt.show() 
+################
+#Avg Even/Odd
+###############
+def Avg_Even_Odd_Error(Put_Call, n, S_0, X, rfr, vol, t):
+    AMN_EUR = "E"    
+    error = BSM(Put_Call, S_0, X, rfr, vol, t)-
+    ((CRR(Put_Call, n, S_0, X, rfr, vol, t, AMN_EUR)+
+      CRR(Put_Call, n+1, S_0, X, rfr, vol, t, AMN_EUR))/2)
+    
+    return error
